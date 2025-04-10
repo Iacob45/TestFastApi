@@ -24,18 +24,17 @@ items = {
 
 Selection = dict[str,str|int|float|Category|list|dict|None]
 
-
-
-@app.get("/")
+'''GET------------------------------------------------------------------------
+---------------------------------------------------------------------------'''
+@app.get("/items")
 def index() -> dict[str,dict[int, Item]]:
     return {"items":items}
 
 @app.get("/items/{item_id}")
 def query_item_by_id(item_id: int) -> Item:
     if item_id not in items:
-        raise HTTPException(status_code=404, detail=f"Item with {item_id} does not exist")
+        raise HTTPException(status_code=404, detail=f"Item with {item_id} does not exist.")
     return items[item_id]
-
 
 @app.get("/sth")
 def show_test_string() -> str:
@@ -45,7 +44,7 @@ def show_test_string() -> str:
 def query_all_items() -> dict[int, Item]:
     return items
 
-@app.get("/items")
+@app.get("/chooseitem")
 def query_item_by_parameters(
         name: str | None = None,
         price: float | None = None,
@@ -65,6 +64,58 @@ def query_item_by_parameters(
         "query": {"name": name, "price": price, "count": count, "category": category},
         "selection": selection
     }
+
+
+'''POST------------------------------------------------------------------------
+---------------------------------------------------------------------------'''
+@app.post("/items")
+def add_item(item: Item) -> dict[str, Item]:
+
+    if item.id in items:
+        raise HTTPException(status_code=400, detail=f"Item with {item.id=} already exists.")
+
+    items[item.id] = item
+    return {"added":item}
+
+
+'''PUT------------------------------------------------------------------------
+---------------------------------------------------------------------------'''
+@app.put("/items/{item_id}")
+def update(
+        item_id: int,
+        name: str | None = None,
+        price: float | None = None,
+        count: int | None = None,
+        category: Category | None = None) -> dict[str, Item]:
+    if item_id not in items:
+        raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist.")
+    if all(info is None for info in (name, price, count, category)):
+        raise HTTPException(status_code=400, detail=f"No parameters provided for update.")
+
+    item = items[item_id]
+    if name is not None:
+        item.name = name
+    if price is not None:
+        item.price = price
+    if count is not None:
+        item.name = count
+    if category is not None:
+        item.category = category
+
+    return {"updated": item}
+
+
+'''DELETE------------------------------------------------------------------------
+---------------------------------------------------------------------------'''
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int) -> dict[str, Item]:
+
+    if item_id not in items:
+        raise HTTPException(status_code=404, detail=f"Item with {item_id=} does not exist.")
+
+    item = items.pop(item_id)
+    return {"deleted": item}
+
 
 print("Working")
 
