@@ -1,6 +1,6 @@
 from enum import Enum
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path, Query
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -22,7 +22,7 @@ items = {
     2: Item(name="Nails", price=5.99, count=4, id=2, category=Category.CONSUMABLES)
 }
 
-Selection = dict[str,str|int|float|Category|list|dict|None]
+Selection = dict[str,str|int|float|Category|None]
 
 '''GET------------------------------------------------------------------------
 ---------------------------------------------------------------------------'''
@@ -31,9 +31,9 @@ def index() -> dict[str,dict[int, Item]]:
     return {"items":items}
 
 @app.get("/items/{item_id}")
-def query_item_by_id(item_id: int) -> Item:
+def query_item_by_id(item_id: int = Path(ge=0)) -> Item:
     if item_id not in items:
-        raise HTTPException(status_code=404, detail=f"Item with {item_id} does not exist.")
+        raise HTTPException(status_code=404, detail=f"Item with {item_id=} does not exist.")
     return items[item_id]
 
 @app.get("/sth")
@@ -47,8 +47,8 @@ def query_all_items() -> dict[int, Item]:
 @app.get("/chooseitem")
 def query_item_by_parameters(
         name: str | None = None,
-        price: float | None = None,
-        count: int | None = None,
+        price: float | None = Query(default=None,ge=0),
+        count: int | None = Query(default=None,ge=0),
         category: Category | None = None) -> dict[str, list | Selection]:
     def check_item(item: Item) -> bool:
         return all(
@@ -81,11 +81,42 @@ def add_item(item: Item) -> dict[str, Item]:
 '''PUT------------------------------------------------------------------------
 ---------------------------------------------------------------------------'''
 @app.put("/items/{item_id}")
-def update(
-        item_id: int,
+def updateoradd(
+        item_id: int = Path(ge=0),
         name: str | None = None,
-        price: float | None = None,
-        count: int | None = None,
+        price: float | None = Query(default=None,ge=0),
+        count: int | None = Query(default=None,ge=0),
+        category: Category | None = None) -> dict[str, Item]:
+    #if item_id not in items:
+    #    raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist.")
+    if all(info is None for info in (name, price, count, category)):
+        raise HTTPException(status_code=400, detail=f"No parameters provided.")
+    if item_id in items:
+        item = items[item_id]
+        if name is not None:
+            item.name = name
+        if price is not None:
+            item.price = price
+        if count is not None:
+            item.name = count
+        if category is not None:
+            item.category = category
+        return {"updated": item}
+    elif all(info is not None for info in (name, price, count, category)):
+        items[item_id] = Item(name=name, price=price, count=count, id=item_id, category=category)
+        return {"added": items[item_id]}
+    else:
+        raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist and not all parameters were added for creating a new Item")
+
+
+'''PATCH------------------------------------------------------------------------
+---------------------------------------------------------------------------'''
+@app.patch("/items/{item_id}")
+def update(
+        item_id: int = Path(ge=0),
+        name: str | None = None,
+        price: float | None = Query(default=None,ge=0),
+        count: int | None = Query(default=None,ge=0),
         category: Category | None = None) -> dict[str, Item]:
     if item_id not in items:
         raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist.")
@@ -108,7 +139,7 @@ def update(
 '''DELETE------------------------------------------------------------------------
 ---------------------------------------------------------------------------'''
 @app.delete("/items/{item_id}")
-def delete_item(item_id: int) -> dict[str, Item]:
+def delete_item(item_id: int = Path(ge=0)) -> dict[str, Item]:
 
     if item_id not in items:
         raise HTTPException(status_code=404, detail=f"Item with {item_id=} does not exist.")
