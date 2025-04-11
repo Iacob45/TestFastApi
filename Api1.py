@@ -1,20 +1,26 @@
 from enum import Enum
 import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-app = FastAPI()
+app = FastAPI(
+    title="Api1",
+    description="Test API using dictionary of tools",
+    version="0.1"
+)
 
 class Category(Enum):
+    """Category of an item"""
     TOOLS = "tools"
     CONSUMABLES = "consumables"
 
 class Item(BaseModel):
-    name: str
-    price: float
-    count: int
-    id: int
-    category: Category
+    """Structure of items"""
+    name: str = Field(description="Name of the item")
+    price: float = Field(description="Price of the item")
+    count: int = Field(description="Number of items")
+    id: int = Field(description="Unique identifier of the item")
+    category: Category = Field(description="Category of the item")
 
 items = {
     0: Item(name="Hammer", price=9.99, count=20, id=0, category=Category.TOOLS),
@@ -24,8 +30,7 @@ items = {
 
 Selection = dict[str,str|int|float|Category|None]
 
-'''GET------------------------------------------------------------------------
----------------------------------------------------------------------------'''
+#GET------------------------------------------------------------------------
 @app.get("/items")
 def index() -> dict[str,dict[int, Item]]:
     return {"items":items}
@@ -66,8 +71,7 @@ def query_item_by_parameters(
     }
 
 
-'''POST------------------------------------------------------------------------
----------------------------------------------------------------------------'''
+#POST------------------------------------------------------------------------
 @app.post("/items")
 def add_item(item: Item) -> dict[str, Item]:
 
@@ -78,8 +82,7 @@ def add_item(item: Item) -> dict[str, Item]:
     return {"added":item}
 
 
-'''PUT------------------------------------------------------------------------
----------------------------------------------------------------------------'''
+#PUT------------------------------------------------------------------------
 @app.put("/items/{item_id}")
 def updateoradd(
         item_id: int = Path(ge=0),
@@ -109,9 +112,13 @@ def updateoradd(
         raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist and not all parameters were added for creating a new Item")
 
 
-'''PATCH------------------------------------------------------------------------
----------------------------------------------------------------------------'''
-@app.patch("/items/{item_id}")
+#PATCH------------------------------------------------------------------------
+@app.patch("/items/{item_id}",
+           responses={
+               404: {"description": "Item not found"},
+               400: {"description": "No arguments specified"},
+           }
+)
 def update(
         item_id: int = Path(ge=0),
         name: str | None = None,
@@ -119,7 +126,7 @@ def update(
         count: int | None = Query(default=None,ge=0),
         category: Category | None = None) -> dict[str, Item]:
     if item_id not in items:
-        raise HTTPException(status_code=400, detail=f"Item with {item_id=} does not exist.")
+        raise HTTPException(status_code=404, detail=f"Item with {item_id=} does not exist.")
     if all(info is None for info in (name, price, count, category)):
         raise HTTPException(status_code=400, detail=f"No parameters provided for update.")
 
@@ -136,8 +143,7 @@ def update(
     return {"updated": item}
 
 
-'''DELETE------------------------------------------------------------------------
----------------------------------------------------------------------------'''
+#DELETE------------------------------------------------------------------------
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int = Path(ge=0)) -> dict[str, Item]:
 
