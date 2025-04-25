@@ -163,23 +163,45 @@ print("Working")
 
 
 
-#STEP 2
+#STEP 2 - CACHING
 @app.on_event("startup")
 async def startup_event():
     pool = redis.ConnectionPool(host="127.0.0.1", port=int(6379), db=int(0), password="parola divina23^&")
-    app.state.redis = redis.Redis(pool)
+    app.state.redis = redis.Redis(connection_pool=pool)
     app.state.http_client = httpx.AsyncClient()
 
 @app.on_event("shutdown")
 async def shutdown():
     app.state.redis.close()
 
-@app.get("/entries")
+#CATFACT
+@app.get("/catfact")
 async def read_item():
-    response = await app.state.http_client.get("https://catfact.ninja/fact")
-    return response.json()
+    value = app.state.redis.get("catfact")
 
+    if value is None:
+        response = await app.state.http_client.get("https://catfact.ninja/fact")
+        value = response.json()
+        data_str = json.dumps(value)
+        app.state.redis.set("catfact", data_str, ex=1800)
+        return value
 
+    return json.loads(value)
+
+@app.get("/fish/{species}")
+async def read_fish(species: str):
+    value = app.state.redis.get(f"fish_{species}")
+
+    if value is None:
+        response = await app.state.http_client.get(f"https://www.fishwatch.gov/api/species/{species}")
+        if response.text == "":
+            raise HTTPException(status_code=404, detail=f"Species not found")
+        value = response.json()
+        data_str = json.dumps(value)
+        app.state.redis.set(f"fish_{species}", data_str, ex=1800)
+        return value
+
+    return json.loads(value)
 
 
 
